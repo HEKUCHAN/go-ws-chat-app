@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ja">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>jQuery WS Chat</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"
+        integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 24px; }
+        #log { border: 1px solid #ccc; padding: 12px; height: 300px; overflow-y: auto; }
+        .msg { margin: 6px 0; }
+        .name { font-weight: bold; margin-right: 6px; color: #0074d9; }
+        form { display: flex; gap: 8px; margin-top: 12px; }
+        input[type=text] { flex: 1; padding: 8px; }
+        input[name=name] { width: 160px; }
+    </style>
+</head>
+
+<body>
+    <h1>WebSocket Chat</h1>
+    <div id="log" aria-live="polite" aria-atomic="false"></div>
+
+    <form id="chatForm" autocomplete="off">
+        <input type="text" name="name" placeholder="名前" maxlength="32" required />
+        <input type="text" name="message" placeholder="メッセージ" maxlength="512" required />
+        <button type="submit">送信</button>
+    </form>
+
+    <script>
+        const wsScheme = location.protocol === 'https:' ? 'wss' : 'ws';
+        const ws = new WebSocket(`${wsScheme}://${location.host}/ws`);
+
+        ws.addEventListener('open', () => appendSystem('** 接続しました **'));
+        ws.addEventListener('close', () => appendSystem('** 切断されました **'));
+        ws.addEventListener('error', () => appendSystem('** エラーが発生しました **'));
+
+        // 受信ハンドラ（JSON を想定）
+        ws.addEventListener('message', (e) => {
+            try {
+                const data = JSON.parse(e.data);
+                appendMessage(data.name || '', data.message || '');
+            } catch (err) {
+                appendSystem('** 不正なメッセージ **');
+            }
+        });
+
+        $('#chatForm').on('submit', function (e) {
+            e.preventDefault();
+            if (ws.readyState !== WebSocket.OPEN) return;
+            const name = $('input[name=name]').val().trim();
+            const message = $('input[name=message]').val().trim();
+            if (!name || !message) return;
+
+            const norm = (s, max) => String(s).replace(/\s+/g, ' ').slice(0, max);
+            const payload = { name: norm(name, 32), message: norm(message, 512) };
+
+            ws.send(JSON.stringify(payload));
+            $('input[name=message]').val('');
+        });
+
+        function appendSystem(text) {
+            const $div = $('<div>').addClass('msg').text(text);
+            $('#log').append($div);
+            $('#log').scrollTop($('#log')[0].scrollHeight);
+        }
+
+        function appendMessage(name, message) {
+            const $line = $('<div>').addClass('msg');
+            const $name = $('<span>').addClass('name').text(name);
+            const $body = $('<span>').text(message);
+            $line.append($name).append($body);
+            $('#log').append($line);
+            $('#log').scrollTop($('#log')[0].scrollHeight);
+        }
+    </script>
+
+</body>
+
+</html>

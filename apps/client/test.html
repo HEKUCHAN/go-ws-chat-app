@@ -51,6 +51,33 @@
             font-size: 0.9em;
             margin-left: 6px;
         }
+
+        @media (max-width: 600px) {
+            #log {
+                height: 55vh;
+            }
+
+            form {
+                flex-direction: column;
+                gap: 4px;
+                width: 100%;
+            }
+
+            input[name=nickname] {
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            input[name=message] {
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            button {
+                width: 100%;
+                height: 40px;
+            }
+        }
     </style>
 </head>
 

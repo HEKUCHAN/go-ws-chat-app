@@ -2,153 +2,199 @@
 <html lang="ja">
 
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>WebSocket Chat</title>
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"
-    integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
-  <style>
-    body { font-family: system-ui, sans-serif; margin: 24px; }
-    #log { border: 1px solid #ccc; padding: 12px; height: 70vh; overflow-y: auto; }
-    .msg { margin: 6px 0; }
-    .name { font-weight: bold; margin-right: 6px; color: #0074d9; }
-    form { display: flex; gap: 8px; margin-top: 12px; }
-    input[type=text] { flex: 1; padding: 8px; }
-    input[name=nickname] { width: 160px; flex: 0 0 auto; }
-    .time { color: #777; font-size: 0.9em; margin-left: 6px; }
-  </style>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WebSocket Chat</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"
+        integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            margin: 24px;
+        }
+
+        #log {
+            border: 1px solid #ccc;
+            padding: 12px;
+            height: 70vh;
+            overflow-y: auto;
+        }
+
+        .msg {
+            margin: 6px 0;
+        }
+
+        .name {
+            font-weight: bold;
+            margin-right: 6px;
+            color: #0074d9;
+        }
+
+        form {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        input[type=text] {
+            flex: 1;
+            padding: 8px;
+        }
+
+        input[name=nickname] {
+            width: 160px;
+            flex: 0 0 auto;
+        }
+
+        .time {
+            color: #777;
+            font-size: 0.9em;
+            margin-left: 6px;
+        }
+    </style>
 </head>
 
 <body>
-  <h1>WebSocket Chat</h1>
-  <div id="log" aria-live="polite" aria-atomic="false"></div>
+    <h1>WebSocket Chat</h1>
+    <div id="log" aria-live="polite" aria-atomic="false"></div>
 
-  <form id="chatForm" autocomplete="off">
-    <input type="text" name="nickname" placeholder="名前" maxlength="32" required />
-    <input type="text" name="message" placeholder="メッセージ" maxlength="512" required />
-    <button type="submit" id="sendButton">送信</button>
-  </form>
+    <form id="chatForm" autocomplete="off">
+        <input type="text" name="nickname" placeholder="名前" maxlength="32" required />
+        <input type="text" name="message" placeholder="メッセージ" maxlength="512" required />
+        <button type="submit" id="sendButton">送信</button>
+    </form>
 
-  <script>
-    const SERVER_HOST = 'localhost:8080';
-    const wsScheme = location.protocol === 'https:' ? 'wss' : 'ws';
-    const httpScheme = location.protocol === 'https:' ? 'https' : 'http'; // ← 混在コンテンツ回避
+    <script>
+        const SERVER_HOST = '54.153.191.161';
+        const wsScheme = location.protocol === 'https:' ? 'wss' : 'ws';
+        const httpScheme = location.protocol === 'https:' ? 'https' : 'http'; // ← 混在コンテンツ回避
 
-    const LOG_MAX = 300;
-    const messages = [];
+        const LOG_MAX = 300;
+        const messages = [];
 
-    function pushToModel(m) {
-      messages.push(m);
-      if (messages.length > LOG_MAX) messages.splice(0, messages.length - LOG_MAX);
-    }
-
-    function render(scrollToEnd = false) {
-      const $log = $('#log');
-      const atBottom = Math.abs($log[0].scrollHeight - $log[0].scrollTop - $log[0].clientHeight) < 2;
-
-      $log.empty();
-      for (const m of messages) {
-        const $line = $('<div>').addClass('msg');
-        const d = new Date(m.time);
-        const formatted = isFinite(d) ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
-
-        if (m._sys) {
-          $line.text(m.message);
-          $log.append($line);
-          continue;
+        function pushToModel(m) {
+            messages.push(m);
+            if (messages.length > LOG_MAX) messages.splice(0, messages.length - LOG_MAX);
         }
 
-        const $name = $('<span>').addClass('name').text(m.name || '');
-        const $body = $('<span>').text(m.message || '');
-        const $time = $('<span>').addClass('time').text(formatted ? `(${formatted})` : '');
-        $line.append($name).append($body).append($time);
-        $log.append($line);
-      }
+        function render(scrollToEnd = false) {
+            const $log = $('#log');
+            const atBottom = Math.abs($log[0].scrollHeight - $log[0].scrollTop - $log[0].clientHeight) < 2;
 
-      if (scrollToEnd || atBottom) $log.scrollTop($log[0].scrollHeight);
-    }
+            $log.empty();
+            for (const m of messages) {
+                const $line = $('<div>').addClass('msg');
+                const d = new Date(m.time);
+                const formatted = isFinite(d) ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
 
-    function addSystem(text) {
-      pushToModel({ name: '', message: text, time: new Date().toISOString(), _sys: true });
-      render(true);
-    }
+                if (m._sys) {
+                    $line.text(m.message);
+                    $log.append($line);
+                    continue;
+                }
 
-    function addMessage(name, message, timeISO, scrollToEnd = true) {
-      pushToModel({ name, message, time: timeISO || new Date().toISOString() });
-      render(scrollToEnd);
-    }
+                const $name = $('<span>').addClass('name').text(m.name || '');
+                const $body = $('<span>').text(m.message || '');
+                const $time = $('<span>').addClass('time').text(formatted ? `(${formatted})` : '');
+                $line.append($name).append($body).append($time);
+                $log.append($line);
+            }
 
-    const ws = new WebSocket(`${wsScheme}://${SERVER_HOST}/ws`);
+            if (scrollToEnd || atBottom) $log.scrollTop($log[0].scrollHeight);
+        }
 
-    ws.addEventListener('open', () => {
-      console.log('WebSocket接続確立');
-      addSystem('** 接続しました **');
-    });
+        function addSystem(text) {
+            pushToModel({ name: '', message: text, time: new Date().toISOString(), _sys: true });
+            render(true);
+        }
 
-    ws.addEventListener('close', () => {
-      console.log('WebSocket切断');
-      addSystem('** 切断されました **');
-    });
+        function addMessage(name, message, timeISO, scrollToEnd = true) {
+            pushToModel({ name, message, time: timeISO || new Date().toISOString() });
+            render(scrollToEnd);
+        }
 
-    ws.addEventListener('error', (err) => {
-      console.error('WebSocketエラー:', err);
-      addSystem('** エラーが発生しました **');
-    });
+        const ws = new WebSocket(`${wsScheme}://${SERVER_HOST}/ws`);
 
-    ws.addEventListener('message', (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        addMessage(data.name || '', data.message || '', data.time);
-      } catch {
-        addSystem('** 不正なメッセージ **');
-      }
-    });
+        ws.addEventListener('open', () => {
+            console.log('WebSocket接続確立');
+            addSystem('** 接続しました **');
+        });
 
-    $.getJSON(`${httpScheme}://${SERVER_HOST}/history`)
-      .done(function (history) {
-        history.forEach(h => addMessage(h.name, h.message, h.time, false));
-        render(true);
-      })
-      .fail(function () {
-        addSystem('** 履歴の取得に失敗しました **');
-      });
+        ws.addEventListener('close', () => {
+            console.log('WebSocket切断');
+            addSystem('** 切断されました **');
+        });
 
-    const savedNickname = localStorage.getItem('chatName');
-    if (savedNickname) $('input[name=nickname]').val(savedNickname);
+        ws.addEventListener('error', (err) => {
+            console.error('WebSocketエラー:', err);
+            addSystem('** エラーが発生しました **');
+        });
 
-    function sendMessage() {
-      if (ws.readyState !== WebSocket.OPEN) {
-        console.log('WebSocket未接続');
-        addSystem('** 送信できません（未接続） **');
-        return;
-      }
+        ws.addEventListener('message', (e) => {
+            try {
+                const data = JSON.parse(e.data);
+                addMessage(data.name || '', data.message || '', data.time);
+            } catch {
+                addSystem('** 不正なメッセージ **');
+            }
+        });
 
-      const nickname = $('input[name=nickname]').val().trim();
-      const message = $('input[name=message]').val().trim();
-      if (!nickname || !message) return;
+        $.getJSON(`${httpScheme}://${SERVER_HOST}/api/history`)
+            .done(function (history) {
+                history.forEach(h => addMessage(h.name, h.message, h.time, false));
+                render(true);
+            })
+            .fail(function () {
+                addSystem('** 履歴の取得に失敗しました **');
+            });
 
-      ws.send(JSON.stringify({ name: nickname, message }));
-      $('input[name=message]').val('');
-      localStorage.setItem('chatName', nickname);
-    }
+        const savedNickname = localStorage.getItem('chatName');
+        if (savedNickname) $('input[name=nickname]').val(savedNickname);
 
-    $('#chatForm').on('submit', function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      sendMessage();
-    });
+        function sendMessage() {
+            if (ws.readyState !== WebSocket.OPEN) {
+                console.log('WebSocket未接続');
+                addSystem('** 送信できません（未接続） **');
+                return;
+            }
 
-    $('#sendButton').on('click', function (e) {
-      e.preventDefault();
-      sendMessage();
-    });
+            const nickname = $('input[name=nickname]').val().trim();
+            const message = $('input[name=message]').val().trim();
+            if (!nickname || !message) return;
 
-    $('input[name=message]').on('keydown', function (e) {
-      if (e.key === 'Enter' && !e.isComposing) {
-        e.preventDefault();
-        sendMessage();
-      }
-    });
-  </script>
+            ws.send(JSON.stringify({ name: nickname, message }));
+            $('input[name=message]').val('');
+            localStorage.setItem('chatName', nickname);
+        }
+
+        $('#chatForm').on('submit', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            sendMessage();
+        });
+
+        $('#sendButton').on('click', function (e) {
+            e.preventDefault();
+            sendMessage();
+        });
+
+        let isComposing = false;
+
+        $('input[name=message]').on('compositionstart', function () {
+            isComposing = true;
+        });
+
+        $('input[name=message]').on('compositionend', function () {
+            isComposing = false;
+        });
+
+        $('input[name=message]').on('keydown', function (e) {
+            if (e.key === 'Enter' && !isComposing && !e.isComposing) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    </script>
 </body>
+
 </html>

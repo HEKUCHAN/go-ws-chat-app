@@ -13,7 +13,13 @@ func main() {
 
 	// ルーティング設定
 	http.HandleFunc("/ws", handler.HandleWebSocket)
-	http.HandleFunc("/history", handler.HandleHistory)
+
+	apiMux := http.NewServeMux()
+	apiMux.HandleFunc("/ws", handler.HandleWebSocket)
+	apiMux.HandleFunc("/history", handler.HandleHistory)
+
+	// /api/ 以下としてマウント
+	http.Handle("/api/", http.StripPrefix("/api", apiMux))
 
 	// サーバー起動
 	log.Println("listening on :8080")
